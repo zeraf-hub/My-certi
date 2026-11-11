@@ -1,15 +1,64 @@
 name: Get Free Cert
+
 on:
   workflow_dispatch:
+
 jobs:
   get-cert:
-    runs-on: macos-latest
+    runs-on: macos-14
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: false
+
+      - name: Install Fastlane
+        run: |
+          gem install fastlane -N
+          fastlane --version
+
       - name: Get Cert
         env:
+          FASTLANE_USER: ${{ secrets.APPLE_ID }}
+          FASTLANE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          FASTLANE_APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
         run: |
-          brew install fastlane
-          fastlane run get_provisioning_profile username:"$APPLE_ID" --capture_output
+          if [ -f "fastlane/Fastfile" ]; then
+            fastlane cert --verbose
+          else
+            mkdir -p fastlane
+            cat > fastlane/Fastfile <<'EOF'
+          default_platform(:ios)
+          platform :ios do
+            lane :cert do
+              get_certificates(username: ENV["FASTLANE_USER"])
+              get_provisioning_profile(app_identifier: "*", type: "development")
+            end
+          end
+          EOF
+            fastlane cert --verbose
+          fi
+
+      - name: Upload Cert
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cert-output
+          path: |
+            *.cer
+            *.p12
+            *.mobileprovision
+            ~/Library/MobileDevice/Provisioning Profiles/
+          if-no-files-found: ignore
