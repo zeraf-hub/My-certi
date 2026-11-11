@@ -1,0 +1,15 @@
+name: Get Free Cert
+on:
+  workflow_dispatch:
+jobs:
+  get-cert:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get Cert
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        run: |
+          brew install fastlane
+          fastlane run get_provisioning_profile username:"$APPLE_ID" --capture_output
