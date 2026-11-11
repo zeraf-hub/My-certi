@@ -5,60 +5,46 @@ on:
 
 jobs:
   get-cert:
-    runs-on: macos-latest
-    timeout-minutes: 30
+    runs-on: macos-13
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
-          bundler-cache: false
+          ruby-version: '3.1'
 
       - name: Install Fastlane
-        run: |
-          gem install fastlane -N
-          fastlane --version
+        run: gem install fastlane
 
       - name: Get Cert
         env:
           FASTLANE_USER: ${{ secrets.APPLE_ID }}
           FASTLANE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          FASTLANE_APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          FASTLANE_SKIP_UPDATE_CHECK: '1'
-          FASTLANE_HIDE_CHANGELOG: '1'
+          FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+          MATCH_PASSWORD: ""
         run: |
-          if [ -f "fastlane/Fastfile" ]; then
-            fastlane cert --verbose
-          else
-            mkdir -p fastlane
-            cat > fastlane/Fastfile <<'EOF'
+          mkdir -p cert-output
+          cat > Fastfile <<'EOF'
           default_platform(:ios)
           platform :ios do
-            lane :cert do
-              get_certificates(username: ENV["FASTLANE_USER"])
-              get_provisioning_profile(app_identifier: "*", type: "development")
+            desc "Get free cert"
+            lane :get_cert do
+              get_certificates(
+                output_path: "cert-output",
+                force: true
+              )
+              get_provisioning_profile(
+                output_path: "cert-output",
+                force: true
+              )
             end
           end
           EOF
-            fastlane cert --verbose
-          fi
+          fastlane get_cert
 
       - name: Upload Cert
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cert-output
-          path: |
-            *.cer
-            *.p12
-            *.mobileprovision
-            ~/Library/MobileDevice/Provisioning Profiles/
-          if-no-files-found: ignore
+          path: cert-output
